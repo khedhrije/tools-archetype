@@ -1,0 +1,27 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: archetype
+  namespace: archetype-dev
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: 50m
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - archetype.khedhri.dev
+      secretName: archetype-dev-tls
+  rules:
+    - host: archetype.khedhri.dev
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: archetype-svc
+                port:
+                  number: 80

@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: archetype
+  namespace: archetype-dev
+  labels:
+    app: archetype
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: archetype
+  template:
+    metadata:
+      labels:
+        app: archetype
+    spec:
+      imagePullSecrets:
+        - name: imageregistry
+      containers:
+        - name: archetype
+          image: docker.io/khedhrije/archetype:1.0.0
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: archetype-config
+            - secretRef:
+                name: archetype-secrets
+          ports:
+            - name: http
+              containerPort: 8080
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+            timeoutSeconds: 2
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: archetype-pvc
