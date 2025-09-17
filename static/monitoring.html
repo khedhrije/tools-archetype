@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Health Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .status-badge { display:inline-flex; align-items:center; padding:0.25rem 0.75rem; border-radius:9999px; font-weight:500; font-size:0.875rem; }
+        .status-ok { background:#10B981; color:#fff; }
+        .status-error { background:#EF4444; color:#fff; }
+        .status-warn { background:#F59E0B; color:#fff; }
+        .status-info { background:#3B82F6; color:#fff; }
+        .status-loading { background:#6B7280; color:#fff; }
+        @keyframes spin { from{transform:rotate(0)} to{transform:rotate(360deg)} }
+        .spinner { display:inline-block; border:2px solid #f3f3f3; border-top:2px solid #3498db; border-radius:50%; width:16px; height:16px; animation:spin 1s linear infinite; }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+
+<div class="container mx-auto p-4 sm:p-6 lg:p-8">
+    <!-- Header -->
+    <header class="flex flex-col sm:flex-row justify-between sm:items-center mb-8">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-800 dark:text-white">System Health Dashboard</h1>
+            <p class="text-gray-500 dark:text-gray-400 mt-1">Last updated: <span id="last-updated">Never</span></p>
+        </div>
+        <button id="run-all-checks-btn" class="mt-4 sm:mt-0 w-full sm:w-auto flex items-center justify-center px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg shadow-md transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.899 2.186l-1.398.799a5.002 5.002 0 00-8.225-1.923V5a1 1 0 01-2 0V3a1 1 0 011-1zm10.899 4.298l1.398-.799a7.002 7.002 0 01-3.27 10.364l-1.065-1.065A5.002 5.002 0 0016 9.5a5.05 5.05 0 00-1.101-.702zM5.101 15.702l-1.398.8a7.002 7.002 0 013.27-10.364l1.065 1.065A5.002 5.002 0 004 10.5a5.05 5.05 0 001.101.702z" clip-rule="evenodd"/></svg>
+            Run All Checks
+        </button>
+    </header>
+
+    <!-- Overall Status -->
+    <div id="overall-status-card" class="mb-8 p-6 rounded-2xl shadow-lg transition-all" data-status="loading">
+        <div class="flex items-center">
+            <div id="overall-status-icon" class="mr-4"></div>
+            <div>
+                <h2 id="overall-status-title" class="text-2xl font-bold">Checking Systems...</h2>
+                <p id="overall-status-message" class="text-lg">Running initial health checks. Please wait.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+
+        <!-- Server Information -->
+        <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
+            <h3 class="text-xl font-semibold mb-4">Server Information</h3>
+            <div id="info-status-badge" class="status-badge status-loading mb-4">Loading...</div>
+            <div id="info-details" class="space-y-2 text-sm"></div>
+        </div>
+
+        <!-- Filesystem Self-Test -->
+        <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
+            <h3 class="text-xl font-semibold mb-4">Filesystem Self-Test</h3>
+            <div id="fs-status-badge" class="status-badge status-loading mb-4">Pending</div>
+            <div id="fs-details" class="text-sm text-gray-500 dark:text-gray-400">Awaiting test...</div>
+        </div>
+
+        <!-- Database Connection -->
+        <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
+            <h3 class="text-xl font-semibold mb-4">Database Connection</h3>
+            <div id="db-status-badge" class="status-badge status-loading mb-4">Pending</div>
+            <div id="db-details" class="text-sm text-gray-500 dark:text-gray-400">Awaiting test...</div>
+        </div>
+
+        <!-- External Services -->
+        <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
+            <h3 class="text-xl font-semibold mb-4">External Services</h3>
+            <div id="services-status-badge" class="status-badge status-loading mb-4">Pending</div>
+            <ul id="services-list" class="space-y-3 text-sm"></ul>
+        </div>
+
+        <!-- System Metrics -->
+        <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
+            <h3 class="text-xl font-semibold mb-4">System Metrics</h3>
+            <div id="metrics-status-badge" class="status-badge status-loading mb-4">Pending</div>
+            <div id="metrics-details" class="space-y-2 text-sm"></div>
+        </div>
+
+        <!-- Event Log -->
+        <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
+            <h3 class="text-xl font-semibold mb-4">Event Log</h3>
+            <div id="log-container" class="text-xs font-mono bg-gray-100 dark:bg-gray-900 p-3 rounded-md h-48 overflow-y-auto"></div>
+        </div>
+
+        <!-- File Management -->
+        <div class="md:col-span-2 bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
+            <h3 class="text-xl font-semibold mb-4">File Management</h3>
+            <div id="fm-status-badge" class="status-badge status-loading mb-4">Loading...</div>
+            <div id="file-list-container" class="overflow-x-auto"></div>
+        </div>
+    </div>
+</div>
+
+<!-- File Content Modal -->
+<div id="file-content-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 hidden">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col">
+        <div class="flex justify-between items-center p-4 border-b dark:border-gray-700">
+            <h3 id="modal-filename" class="text-xl font-semibold"></h3>
+            <button id="close-modal-btn" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+        <div class="p-4 overflow-y-auto"><pre id="file-content-pre" class="text-sm whitespace-pre-wrap break-words"></pre></div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+
+
+        const PROTECTED = new Set(['.first-mount.sh', 'lost+found']);
+
+        // --- Helpers ---
+        const safeToLocale = (v) => {
+            const d = new Date(v);
+            return isNaN(d.getTime()) ? 'Unknown' : d.toLocaleString();
+        };
+        const fmtBytes = (n) => {
+            if (typeof n !== 'number') return '—';
+            const units = ['B','KB','MB','GB','TB'];
+            let i = 0, val = n;
+            while (val >= 1024 && i < units.length-1) { val /= 1024; i++; }
+            return `${val.toFixed(1)} ${units[i]}`;
+        };
+
+        // --- API ---
+        const fetchFromServer = async (endpoint, options) => {
+            const res = await fetch(endpoint, options);
+            const ct = res.headers.get('Content-Type') || '';
+            const isJSON = ct.includes('application/json');
+            const body = isJSON ? await res.json().catch(() => ({})) : await res.text();
+            if (!res.ok) {
+                const err = (typeof body === 'object' && body) ? body : { message: `HTTP ${res.status}` };
+                throw err;
+            }
+            return body;
+        };
+
+        const checkServerInfo = async () => {
+            const version = await fetchFromServer('api/version');
+            const readyz = await fetchFromServer('api/readyz');
+            return { ...version, ...readyz };
+        };
+        const checkFilesystem = () => fetchFromServer('api/data/selftest', { method: 'POST' });
+        const checkDatabase   = () => fetchFromServer('api/check/database');
+        const checkServices   = () => fetchFromServer('api/check/services');
+        const checkMetrics    = () => fetchFromServer('api/check/metrics');
+
+        const listFiles  = () => fetchFromServer('api/data/list');
+        const readFile   = (f) => fetchFromServer(`api/data/read?file=${encodeURIComponent(f)}`);
+        const deleteFile = (f) => fetchFromServer(`api/data/?file=${encodeURIComponent(f)}`, { method: 'DELETE' });
+
+        // --- DOM refs ---
+        const el = {
+            runAllChecksBtn: document.getElementById('run-all-checks-btn'),
+            lastUpdated: document.getElementById('last-updated'),
+            log: document.getElementById('log-container'),
+            overall: {
+                card: document.getElementById('overall-status-card'),
+                icon: document.getElementById('overall-status-icon'),
+                title: document.getElementById('overall-status-title'),
+                msg: document.getElementById('overall-status-message'),
+            },
+            info: { badge: document.getElementById('info-status-badge'), details: document.getElementById('info-details') },
+            fs:   { badge: document.getElementById('fs-status-badge'), details: document.getElementById('fs-details') },
+            db:   { badge: document.getElementById('db-status-badge'), details: document.getElementById('db-details') },
+            svc:  { badge: document.getElementById('services-status-badge'), list: document.getElementById('services-list') },
+            met:  { badge: document.getElementById('metrics-status-badge'), details: document.getElementById('metrics-details') },
+            fm:   { badge: document.getElementById('fm-status-badge'), container: document.getElementById('file-list-container') },
+            modal: {
+                el: document.getElementById('file-content-modal'),
+                closeBtn: document.getElementById('close-modal-btn'),
+                filename: document.getElementById('modal-filename'),
+                content: document.getElementById('file-content-pre'),
+            }
+        };
+
+        // --- UI helpers ---
+        const addLog = (message, type='info') => {
+            const ts = new Date().toLocaleTimeString();
+            const color = type === 'error' ? 'text-red-500' : type === 'warn' ? 'text-yellow-500' : 'text-gray-500';
+            el.log.innerHTML += `<p><span class="text-blue-400">${ts}</span> <span class="${color}">${message}</span></p>`;
+            el.log.scrollTop = el.log.scrollHeight;
+        };
+
+        const setBadge = (badge, status, text) => {
+            badge.className = 'status-badge';
+            const map = { ok:'status-ok', error:'status-error', warn:'status-warn', loading:'status-loading', info:'status-info' };
+            badge.classList.add(map[status] || 'status-info');
+            badge.textContent = text;
+        };
+
+        const icons = {
+            ok: `<svg class="h-10 w-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`,
+            error: `<svg class="h-10 w-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`,
+            loading: `<div class="spinner !w-10 !h-10 !border-4"></div>`
+        };
+
+        const setOverall = (status, title, msg) => {
+            const card = el.overall.card;
+            card.className = 'mb-8 p-6 rounded-2xl shadow-lg transition-all';
+            const colors = { ok:'bg-green-500 text-white', error:'bg-red-500 text-white', loading:'bg-gray-500 text-white' };
+            card.classList.add(...(colors[status] || 'bg-gray-500 text-white').split(' '));
+            el.overall.icon.innerHTML = icons[status] || icons.loading;
+            el.overall.title.textContent = title;
+            el.overall.msg.textContent = msg;
+        };
+
+        // --- Core flow ---
+        const runChecks = async () => {
+            el.runAllChecksBtn.disabled = true;
+            el.runAllChecksBtn.classList.add('opacity-50','cursor-not-allowed');
+            setOverall('loading','Running Checks...','Please wait while we assess system health.');
+            addLog('Starting all health checks…');
+            let allOK = true;
+
+            // Server Info
+            try {
+                const info = await checkServerInfo();
+                setBadge(el.info.badge, 'ok', 'Online');
+                const builtAt = info.builtAt ? safeToLocale(info.builtAt) : 'Unknown';
+                const dataDir = info.checks?.dataDir || '—';
+                el.info.details.innerHTML = `
+        <div class="flex justify-between"><span class="font-medium text-gray-600 dark:text-gray-400">Version:</span><span>${info.version ?? '—'}</span></div>
+        <div class="flex justify-between"><span class="font-medium text-gray-600 dark:text-gray-400">Revision:</span><span class="font-mono text-xs">${info.revision ?? '—'}</span></div>
+        <div class="flex justify-between"><span class="font-medium text-gray-600 dark:text-gray-400">Built At:</span><span>${builtAt}</span></div>
+        <div class="flex justify-between"><span class="font-medium text-gray-600 dark:text-gray-400">Data Dir:</span><code class="bg-gray-200 dark:bg-gray-700 px-1 py-0.5 rounded">${dataDir}</code></div>
+      `;
+                addLog('Server info check passed.');
+            } catch (e) {
+                allOK = false;
+                setBadge(el.info.badge, 'error', 'Offline');
+                el.info.details.innerHTML = `<p class="text-red-500">${e?.message || 'Server info error'}</p>`;
+                addLog(`Server info check failed: ${e?.message || 'error'}`, 'error');
+            }
+
+            // Filesystem
+            try {
+                const fs = await checkFilesystem();
+                const d = fs?.detail ?? fs; // handle wrapped payload
+                const match = Boolean(d?.match);
+                const delErr = typeof d?.deleteErr === 'string' ? d.deleteErr.trim() : d?.deleteErr;
+
+                if (!match || delErr) {
+                    throw new Error(`Match: ${String(match)}, Delete Err: ${delErr || 'none'}`);
+                }
+
+                setBadge(el.fs.badge, 'ok', 'Passed');
+                el.fs.details.textContent = `Successfully wrote, read, and deleted test file '${d.file}'.`;
+                addLog('Filesystem self-test passed.');
+            } catch (e) {
+                allOK = false;
+                setBadge(el.fs.badge, 'error', 'Failed');
+                el.fs.details.textContent = e?.message || 'Filesystem check failed';
+                addLog(`Filesystem self-test failed: ${e?.message || 'error'}`, 'error');
+            }
+
+
+            // Database
+            try {
+                const db = await checkDatabase();
+                const mode = db.detail?.mode || 'unknown';
+                const now = db.detail?.nowUTC || '';
+                const ver = db.detail?.version || '';
+                setBadge(el.db.badge, 'ok', 'Connected');
+                el.db.details.innerHTML = `
+        <div class="flex justify-between"><span class="font-medium text-gray-600 dark:text-gray-400">Mode:</span><span>${mode}</span></div>
+        ${now ? `<div class="flex justify-between"><span class="font-medium text-gray-600 dark:text-gray-400">DB Time (UTC):</span><span>${now}</span></div>` : ''}
+        ${ver ? `<div class="flex justify-between"><span class="font-medium text-gray-600 dark:text-gray-400">Version:</span><span>${ver}</span></div>` : ''}
+      `;
+                addLog('Database check passed.');
+            } catch (e) {
+                allOK = false;
+                setBadge(el.db.badge, 'error', 'Failed');
+                const d = e?.detail || {};
+                const extra = d.mode ? ` (mode: ${d.mode}${d.addr ? `, addr: ${d.addr}` : ''})` : '';
+                el.db.details.textContent = `${e?.error || e?.message || 'DB error'}${extra}`;
+                addLog(`Database check failed: ${e?.error || e?.message || 'error'}`, 'error');
+            }
+
+            // Services
+            try {
+                const svc = await checkServices();
+                const services = svc?.detail?.services || {};
+                setBadge(el.svc.badge, 'ok', 'All Operational');
+                el.svc.list.innerHTML = Object.entries(services).map(([name, data]) => {
+                    const st = data.status === 'ok' ? 'status-ok' : data.status === 'degraded' ? 'status-warn' : 'status-error';
+                    const label = data.status === 'ok' ? 'Operational' : (data.status || 'Unknown');
+                    return `<li class="flex justify-between items-center"><span>${name}</span><span class="status-badge ${st}">${label}${data.code ? ` (${data.code})` : ''}</span></li>`;
+                }).join('') || `<p class="text-gray-500 dark:text-gray-400">No services listed.</p>`;
+                addLog('Service checks passed.');
+            } catch (e) {
+                allOK = false;
+                setBadge(el.svc.badge, 'error', 'Issues Detected');
+                const services = e?.detail?.services || {};
+                if (Object.keys(services).length) {
+                    el.svc.list.innerHTML = Object.entries(services).map(([name, data]) => {
+                        const st = data.status === 'ok' ? 'status-ok' : data.status === 'degraded' ? 'status-warn' : 'status-error';
+                        const label = data.status === 'ok' ? 'Operational' : (data.status || 'Error');
+                        return `<li class="flex justify-between items-center"><span>${name}</span><span class="status-badge ${st}">${label}${data.code ? ` (${data.code})` : ''}</span></li>`;
+                    }).join('');
+                } else {
+                    el.svc.list.innerHTML = `<p class="text-red-500">${e?.error || e?.message || 'Service error'}</p>`;
+                }
+                addLog(`Service checks found issues: ${e?.error || e?.message || 'error'}`, 'error');
+            }
+
+            // Metrics
+            try {
+                const met = await checkMetrics();
+                const d = met?.detail || {};
+                setBadge(el.met.badge, 'ok', 'Nominal');
+                el.met.details.innerHTML = `
+        <div class="flex justify-between"><span class="font-medium text-gray-600 dark:text-gray-400">Goroutines:</span><span>${d.goroutines ?? '—'}</span></div>
+        <div class="flex justify-between"><span class="font-medium text-gray-600 dark:text-gray-400">Mem Alloc:</span><span>${fmtBytes(d.memAlloc)}</span></div>
+        <div class="flex justify-between"><span class="font-medium text-gray-600 dark:text-gray-400">Heap Inuse:</span><span>${fmtBytes(d.heapInuse)}</span></div>
+        <div class="flex justify-between"><span class="font-medium text-gray-600 dark:text-gray-400">GC Count:</span><span>${d.gcCount ?? '—'}</span></div>
+      `;
+                addLog('Metrics check passed.');
+            } catch (e) {
+                allOK = false; // still mark as issue to drive red overall if needed
+                setBadge(el.met.badge, 'warn', 'Unavailable');
+                el.met.details.innerHTML = `<p class="text-yellow-500">${e?.error || e?.message || 'Metrics unavailable'}</p>`;
+                addLog(`Metrics agent unavailable: ${e?.error || e?.message || 'error'}`, 'warn');
+            }
+
+            // Files list
+            await populateFileList();
+
+            // Overall
+            if (allOK) {
+                setOverall('ok','All Systems Operational','All checks passed successfully.');
+                addLog('All checks completed. System is healthy.');
+            } else {
+                setOverall('error','Issues Detected','One or more systems reported an error.');
+                addLog('All checks completed. Issues found.', 'error');
+            }
+
+            el.lastUpdated.textContent = new Date().toLocaleString();
+            el.runAllChecksBtn.disabled = false;
+            el.runAllChecksBtn.classList.remove('opacity-50','cursor-not-allowed');
+        };
+
+        const populateFileList = async () => {
+            try {
+                const data = await listFiles();
+                const d = data?.detail ?? data;              // <— unwrap
+                const files = Array.isArray(d?.files) ? d.files : [];
+
+                setBadge(el.fm.badge, 'ok', `${files.length} files`);
+                if (files.length === 0) {
+                    el.fm.container.innerHTML = `<p class="text-gray-500 dark:text-gray-400">No files found in data directory.</p>`;
+                    return;
+                }
+
+                el.fm.container.innerHTML = `
+      <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+        <thead class="bg-gray-50 dark:bg-gray-700"><tr>
+          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Name</th>
+          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Size</th>
+          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Modified</th>
+          <th class="relative px-4 py-2"><span class="sr-only">Actions</span></th>
+        </tr></thead>
+        <tbody id="file-list-body" class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+          ${files.map(f => {
+                    const actions = PROTECTED.has(f.name)
+                        ? `<span class="status-badge status-info">Protected</span>`
+                        : `<button class="read-btn text-indigo-600 hover:text-indigo-900 dark:text-indigo-400" data-filename="${f.name}">Read</button>
+                 <button class="delete-btn text-red-600 hover:text-red-900 dark:text-red-400 ml-4" data-filename="${f.name}">Delete</button>`;
+                    return `
+              <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                <td class="px-4 py-2 whitespace-nowrap text-sm font-medium">${f.name}</td>
+                <td class="px-4 py-2 whitespace-nowrap text-sm">${(Number(f.size||0)/1024).toFixed(2)} KB</td>
+                <td class="px-4 py-2 whitespace-nowrap text-sm">${safeToLocale(f.modTime)}</td>
+                <td class="px-4 py-2 whitespace-nowrap text-right text-sm">${actions}</td>
+              </tr>`;
+                }).join('')}
+        </tbody>
+      </table>`;
+            } catch (e) {
+                setBadge(el.fm.badge, 'error', 'Error');
+                el.fm.container.innerHTML = `<p class="text-red-500">${e?.message || 'Failed to list files'}</p>`;
+                addLog(`Failed to list files: ${e?.message || 'error'}`, 'error');
+            }
+        };
+
+
+        // --- Events ---
+        el.runAllChecksBtn.addEventListener('click', runChecks);
+
+        el.fm.container.addEventListener('click', async (e) => {
+            const target = e.target;
+            const filename = target?.dataset?.filename;
+            if (!filename) return;
+
+            if (target.classList.contains('read-btn')) {
+                try {
+                    const content = await readFile(filename);
+                    el.modal.filename.textContent = filename;
+                    el.modal.content.textContent = content;
+                    el.modal.el.classList.remove('hidden');
+                } catch (err) {
+                    addLog(`Error reading ${filename}: ${err?.message || 'error'}`, 'error');
+                }
+            }
+
+
+
+            if (target.classList.contains('delete-btn')) {
+                if (PROTECTED.has(filename)) {
+                    addLog(`"${filename}" is protected and cannot be deleted.`, 'warn');
+                    return;
+                }
+                if (window.confirm(`Are you sure you want to delete "${filename}"?`)) {
+                    try {
+                        await deleteFile(filename);
+                        addLog(`Successfully deleted ${filename}.`);
+                        await populateFileList();
+                    } catch (err) {
+                        addLog(`Error deleting ${filename}: ${err?.message || 'error'}`, 'error');
+                    }
+                }
+            }
+        });
+
+        el.modal.closeBtn.addEventListener('click', () => el.modal.el.classList.add('hidden'));
+        el.modal.el.addEventListener('click', (e) => {
+            if (e.target === el.modal.el) el.modal.el.classList.add('hidden');
+        });
+
+
+
+
+        // Initial
+        runChecks();
+    });
+</script>
+
+</body>
+</html>

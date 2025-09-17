@@ -34,7 +34,7 @@ spec:
               mountPath: /data
           readinessProbe:
             httpGet:
-              path: /readyz
+              path: /api/readyz
               port: http
             initialDelaySeconds: 3
             periodSeconds: 10
@@ -42,7 +42,7 @@ spec:
             failureThreshold: 3
           livenessProbe:
             httpGet:
-              path: /livez
+              path: /api/livez
               port: http
             initialDelaySeconds: 10
             periodSeconds: 20
